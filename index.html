@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Moltbot WebGL Tactical Camera v3.0</title>
+    <title>Moltbot Tactical Pro Cam</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         :root {
-            --accent: #00ff41;
+            --accent: #ffd60a;
             --bg: #000;
             --safe-top: env(safe-area-inset-top);
             --safe-bottom: env(safe-area-inset-bottom);
@@ -16,9 +16,10 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background: var(--bg); color: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #000; color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
             overflow: hidden;
+            user-select: none;
         }
 
         #gl-canvas {
@@ -34,52 +35,82 @@
             padding: var(--safe-top) 0 var(--safe-bottom) 0;
         }
 
-        .header {
-            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+        /* 頂部控制列 - 擬真 iOS */
+        .top-bar {
+            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
             pointer-events: auto;
         }
-        .v-tag { font-family: monospace; font-size: 11px; color: var(--accent); letter-spacing: 1px; }
-        .text-btn { font-size: 12px; font-weight: bold; background: rgba(255,255,255,0.15); padding: 8px 14px; border-radius: 6px; }
+        .icon-circ {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 16px;
+        }
 
         .bottom-area {
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(20px);
-            padding-bottom: calc(var(--safe-bottom) + 15px);
-            pointer-events: auto; display: flex; flex-direction: column; align-items: center;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            padding-bottom: 20px;
+            pointer-events: auto;
+            display: flex; flex-direction: column; align-items: center;
         }
 
-        .filter-nav {
-            display: flex; gap: 12px; overflow-x: auto; width: 100%;
-            padding: 15px 20px; scrollbar-width: none;
+        /* 模式切換器 */
+        .mode-slider {
+            display: flex; gap: 20px; padding: 15px 0;
+            font-size: 13px; font-weight: 600; letter-spacing: 1px;
+            color: #888; text-transform: uppercase;
         }
-        .filter-nav::-webkit-scrollbar { display: none; }
-        .filter-btn {
-            padding: 10px 20px; border-radius: 10px;
-            background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.2);
-            font-size: 12px; white-space: nowrap; color: #ccc; transition: 0.2s;
-        }
-        .filter-btn.active { background: var(--accent); color: #000; font-weight: bold; border-color: var(--accent); }
+        .mode-item.active { color: var(--accent); }
 
+        /* 濾鏡選擇器 - 橫向滑動 */
+        .vibe-nav {
+            width: 100%; display: flex; gap: 15px; overflow-x: auto;
+            padding: 10px 20px; scrollbar-width: none;
+        }
+        .vibe-nav::-webkit-scrollbar { display: none; }
+        .vibe-btn {
+            min-width: 70px; padding: 8px 12px; border-radius: 6px;
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            font-size: 11px; white-space: nowrap; color: #999; text-align: center;
+        }
+        .vibe-btn.active { border-color: var(--accent); color: #fff; background: rgba(255,214,10,0.1); }
+
+        /* 快門組件 */
         .shutter-row {
-            width: 100%; display: flex; justify-content: space-around; align-items: center; padding: 10px 0;
+            width: 100%; display: flex; justify-content: space-around; align-items: center;
+            padding: 15px 0;
         }
-        .burst-counter { width: 50px; text-align: center; font-size: 15px; font-family: monospace; color: var(--accent); font-weight: bold; }
-        .shutter-outer {
-            width: 78px; height: 78px; border-radius: 50%; border: 4px solid #fff;
+        .gallery-preview {
+            width: 48px; height: 48px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3);
+            background-size: cover; background-position: center; position: relative;
+        }
+        .burst-badge {
+            position: absolute; top: -8px; right: -8px; background: var(--accent); color: #000;
+            font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px;
+        }
+        .shutter-btn {
+            width: 76px; height: 76px; border-radius: 50%; border: 4px solid #fff;
             display: flex; justify-content: center; align-items: center; cursor: pointer;
         }
         .shutter-inner { width: 62px; height: 62px; border-radius: 50%; background: #fff; transition: 0.1s; }
-        .shutter-btn:active .shutter-inner { transform: scale(0.85); }
+        .shutter-btn:active .shutter-inner { transform: scale(0.9); }
+        
+        .flip-btn { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; justify-content: center; align-items: center; font-size: 22px; }
 
+        /* 選片燈箱 */
         #gallery-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100;
             display: none; flex-direction: column; padding: var(--safe-top) 15px var(--safe-bottom) 15px;
         }
-        .gallery-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; overflow-y: auto; flex-grow: 1; }
-        .gallery-item { position: relative; border-radius: 8px; overflow: hidden; border: 3px solid transparent; }
+        .gallery-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #333; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; overflow-y: auto; flex-grow: 1; padding: 15px 0; }
+        .gallery-item { position: relative; border-radius: 12px; overflow: hidden; border: 2px solid transparent; }
         .gallery-item.selected { border-color: var(--accent); }
         .gallery-item img { width: 100%; display: block; }
+        .gallery-footer { display: flex; gap: 10px; padding: 20px 0; }
+        .action-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 14px; }
 
         #flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 1000; opacity: 0; pointer-events: none; }
     </style>
@@ -91,33 +122,42 @@
     <div id="flash"></div>
 
     <div id="ui-layer">
-        <div class="header">
-            <div class="text-btn" onclick="toggleCamera()">翻轉鏡頭</div>
-            <div class="v-tag" id="res-status">4K MODE</div>
-            <div class="text-btn" onclick="openGallery()" id="gallery-trigger" style="display:none">選片</div>
+        <div class="top-bar">
+            <div class="icon-circ">⚡</div>
+            <div style="font-size: 12px; font-weight: bold; letter-spacing: 1px;">PRO VIDEO</div>
+            <div class="icon-circ" onclick="clearBurst()">C</div>
         </div>
 
         <div class="bottom-area">
-            <div class="filter-nav" id="filter-nav"></div>
+            <div class="vibe-nav" id="vibe-nav"></div>
+            
+            <div class="mode-slider">
+                <div class="mode-item">影片</div>
+                <div class="mode-item active">照片</div>
+                <div class="mode-item">人像</div>
+            </div>
+
             <div class="shutter-row">
-                <div class="burst-counter" id="burst-count">0/10</div>
-                <div class="shutter-outer" onclick="requestCapture()">
+                <div class="gallery-preview" id="gallery-trigger" onclick="openGallery()" style="visibility: hidden;">
+                    <div class="burst-badge" id="burst-count">0</div>
+                </div>
+                <div class="shutter-btn" onclick="handleShutter()">
                     <div class="shutter-inner"></div>
                 </div>
-                <div class="text-btn" onclick="clearBurst()">清除</div>
+                <div class="flip-btn" onclick="toggleCamera()">🔄</div>
             </div>
         </div>
     </div>
 
     <div id="gallery-overlay">
-        <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
-            <h4 style="margin:0;">高解析度選片</h4>
-            <div class="text-btn" onclick="closeGallery()">返回</div>
+        <div class="gallery-header">
+            <h3 style="margin:0">戰術選片</h3>
+            <div onclick="closeGallery()" style="color: var(--accent); font-weight:600">取消</div>
         </div>
         <div class="gallery-grid" id="gallery-grid"></div>
-        <div style="display:flex; gap:10px; padding: 20px 0;">
-            <button class="text-btn" style="flex:1; background:var(--accent); color:#000;" onclick="saveSelected()">儲存所選</button>
-            <button class="text-btn" style="flex:1;" onclick="clearBurst()">捨棄全部</button>
+        <div class="gallery-footer">
+            <button class="action-btn" style="background:#222; color:#fff" onclick="clearBurst()">捨棄</button>
+            <button class="action-btn" style="background:var(--accent); color:#000" onclick="saveSelected()">儲存所選</button>
         </div>
     </div>
 
@@ -125,10 +165,9 @@
     attribute vec2 position;
     varying vec2 vTexCoord;
     uniform bool uMirror;
-    uniform vec2 uTexScale; // 用於修正拉伸 (Cover 效果)
+    uniform vec2 uTexScale;
     void main() {
         float x = uMirror ? -position.x : position.x;
-        // 修正 UV 座標以維持比例
         vTexCoord = vec2(x * 0.5 + 0.5, 1.0 - (position.y * 0.5 + 0.5));
         vTexCoord = (vTexCoord - 0.5) * uTexScale + 0.5;
         gl_Position = vec4(position, 0.0, 1.0);
@@ -141,26 +180,30 @@
     uniform sampler2D uSampler;
     uniform vec2 uResolution;
     
-    uniform float uSharpness;
-    uniform float uTemperature;
+    // 注入參數
+    uniform float uExposure;
+    uniform float uBrilliance;
     uniform float uHighlights;
     uniform float uShadows;
     uniform float uContrast;
     uniform float uBrightness;
+    uniform float uBlackPoint;
     uniform float uSaturation;
-    uniform float uBrilliance;
+    uniform float uVibrance;
+    uniform float uTemperature;
+    uniform float uTint;
+    uniform float uSharpness;
+    uniform float uVignette;
 
     void main() {
-        // 防止 UV 越界 (邊緣填黑)
         if (vTexCoord.x < 0.0 || vTexCoord.x > 1.0 || vTexCoord.y < 0.0 || vTexCoord.y > 1.0) {
-            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-            return;
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return;
         }
 
         vec2 pixelSize = 1.0 / uResolution;
         vec4 center = texture2D(uSampler, vTexCoord);
         
-        // 1. Sharpness (High-Res 卷積矩陣)
+        // 1. Sharpness (Convolution)
         if (uSharpness > 0.0) {
             vec4 n = texture2D(uSampler, vTexCoord + vec2(0.0, pixelSize.y));
             vec4 s = texture2D(uSampler, vTexCoord - vec2(0.0, pixelSize.y));
@@ -171,25 +214,38 @@
 
         vec3 color = center.rgb;
 
-        // 2. Exposure & Brightness (+20% 增益校準)
-        color = color * (1.1 + uBrightness);
+        // 2. Exposure & Brightness
+        color *= pow(2.0, uExposure);
+        color += uBrightness;
 
-        // 3. Temperature (色溫補償)
-        color.r += uTemperature * 0.05;
-        color.b -= uTemperature * 0.05;
+        // 3. Black Point
+        color = max(vec3(0.0), color - uBlackPoint) / (1.0 - uBlackPoint);
 
-        // 4. Highlights / Shadows (分區映射)
+        // 4. Highlights & Shadows
         float luma = dot(color, vec3(0.299, 0.587, 0.114));
         if (luma < 0.4) color += color * uShadows * ((0.4 - luma) / 0.4);
         if (luma > 0.6) color += color * uHighlights * ((luma - 0.6) / 0.4);
 
-        // 5. Brilliance & Contrast
-        color = mix(color, pow(color, vec3(1.0 - uBrilliance * 0.3)), 0.5);
+        // 5. Contrast & Brilliance
+        color = mix(color, pow(color, vec3(1.0 - uBrilliance * 0.4)), 0.5);
         color = (color - 0.5) * (1.0 + uContrast) + 0.5;
 
-        // 6. Saturation
+        // 6. Saturation & Vibrance
         float gray = dot(color, vec3(0.299, 0.587, 0.114));
-        color = mix(vec3(gray), color, 1.0 + uSaturation);
+        float maxColor = max(color.r, max(color.g, color.b));
+        float minColor = min(color.r, min(color.g, color.b));
+        float sat = (maxColor - minColor) / (maxColor + 0.001);
+        color = mix(vec3(gray), color, 1.0 + uSaturation + uVibrance * (1.0 - sat));
+
+        // 7. Temperature & Tint
+        color.r += uTemperature * 0.1;
+        color.b -= uTemperature * 0.1;
+        color.g += uTint * 0.05;
+
+        // 8. Vignette
+        vec2 dist = (vTexCoord - 0.5) * 2.0;
+        float vign = 1.0 - dot(dist, dist) * uVignette;
+        color *= clamp(vign, 0.0, 1.0);
 
         gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
     }
@@ -197,25 +253,39 @@
 
 <script>
     const canvas = document.getElementById('gl-canvas');
-    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, antialias: true });
+    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
     const video = document.getElementById('video');
     const flash = document.getElementById('flash');
     const burstCountLabel = document.getElementById('burst-count');
     const galleryOverlay = document.getElementById('gallery-overlay');
     const galleryGrid = document.getElementById('gallery-grid');
     const galleryTrigger = document.getElementById('gallery-trigger');
-    const resStatus = document.getElementById('res-status');
 
     let program, texture;
     let currentFacingMode = 'environment';
     let isMirrored = false;
     let burstPhotos = [];
     let shouldCapture = false;
+    let lastClickTime = 0;
 
     const presets = [
-        { id: 'jp', name: "日系清新", p: { sharpness: 0.3, temp: -0.33, highlights: -0.06, shadows: 0.09, contrast: -0.15, brightness: 0.17, saturation: 0.09, brilliance: 0.12 } },
-        { id: 'fuji', name: "港風富士", p: { sharpness: 0.5, temp: 0.15, highlights: 0.15, shadows: -0.10, contrast: 0.08, brightness: 0.32, saturation: 0.04, brilliance: -0.06 } },
-        { id: 'orig', name: "ORIGINAL", p: { sharpness: 0, temp: 0, highlights: 0, shadows: 0, contrast: 0, brightness: 0, saturation: 0, brilliance: 0 } }
+        { name: "原圖", p: { exposure: 0, brilliance: 0, highlights: 0, shadows: 0, contrast: 0, brightness: 0, blackPoint: 0, saturation: 0, vibrance: 0, temp: 0, tint: 0, sharpness: 0, vignette: 0 } },
+        { 
+            name: "柯達底片", 
+            p: { exposure: 0, brilliance: -0.16, highlights: -0.10, shadows: -0.30, contrast: -0.05, brightness: 0.06, blackPoint: 0.30, saturation: 0.10, vibrance: -0.45, temp: 0.50, tint: -0.16, sharpness: 0.08, vignette: 0 } 
+        },
+        { 
+            name: "富士底片", 
+            p: { exposure: -0.05, brilliance: -0.08, highlights: 0.15, shadows: -0.12, contrast: 0, brightness: 0, blackPoint: 0, saturation: 0, vibrance: -0.06, temp: -0.10, tint: 0, sharpness: 0, vignette: 0.15 } 
+        },
+        { 
+            name: "日落色調", 
+            p: { exposure: 0.30, brilliance: 0.35, highlights: -0.30, shadows: 0.20, contrast: 0.25, brightness: 0, blackPoint: 0.15, saturation: 0.10, vibrance: 0.20, temp: 0.3, tint: 0, sharpness: 0.15, vignette: 0 } 
+        },
+        { 
+            name: "電影色彩", 
+            p: { exposure: -0.35, brilliance: -0.30, highlights: -0.30, shadows: 0.30, contrast: 0.15, blackPoint: -0.20, saturation: 0, vibrance: 0.10, temp: 0.15, tint: 0.10, sharpness: 0.10, vignette: 0 } 
+        }
     ];
 
     let activePreset = presets[0];
@@ -223,25 +293,14 @@
     async function initCamera() {
         if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
         try {
-            // 解鎖 iPhone 12 最高解析度
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: currentFacingMode, 
-                    width: { ideal: 4032 }, 
-                    height: { ideal: 3024 },
-                    frameRate: { ideal: 60 }
-                }
+                video: { facingMode: currentFacingMode, width: { ideal: 3840 }, height: { ideal: 2160 } }
             });
             video.srcObject = stream;
             await video.play();
             isMirrored = (currentFacingMode === 'user');
-            
-            // 獲取實際硬體解析度並同步至畫布
-            const settings = stream.getVideoTracks()[0].getSettings();
-            resStatus.textContent = `${settings.width}x${settings.height}`;
-            
             resize();
-        } catch (err) { alert("硬體調用失敗"); }
+        } catch (err) { alert(err.message); }
     }
 
     function initWebGL() {
@@ -271,7 +330,6 @@
     }
 
     function resize() {
-        // 畫布解析度同步至螢幕物理像素
         canvas.width = window.innerWidth * window.devicePixelRatio;
         canvas.height = window.innerHeight * window.devicePixelRatio;
         gl.viewport(0, 0, canvas.width, canvas.height);
@@ -282,41 +340,27 @@
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
             
-            // 計算 Aspect Ratio 修正 (Object-fit: cover 邏輯)
-            const videoAspect = video.videoWidth / video.videoHeight;
-            const canvasAspect = canvas.width / canvas.height;
-            let scaleX = 1, scaleY = 1;
-            if (videoAspect > canvasAspect) {
-                scaleX = canvasAspect / videoAspect;
-            } else {
-                scaleY = videoAspect / canvasAspect;
-            }
+            const vAspect = video.videoWidth / video.videoHeight;
+            const cAspect = canvas.width / canvas.height;
+            let sx = 1, sy = 1;
+            if (vAspect > cAspect) sx = cAspect / vAspect; else sy = vAspect / cAspect;
 
             gl.uniform1i(gl.getUniformLocation(program, 'uMirror'), isMirrored);
-            gl.uniform2f(gl.getUniformLocation(program, 'uTexScale'), scaleX, scaleY);
+            gl.uniform2f(gl.getUniformLocation(program, 'uTexScale'), sx, sy);
             gl.uniform2f(gl.getUniformLocation(program, 'uResolution'), canvas.width, canvas.height);
             
             const p = activePreset.p;
-            gl.uniform1f(gl.getUniformLocation(program, 'uSharpness'), p.sharpness);
-            gl.uniform1f(gl.getUniformLocation(program, 'uTemperature'), p.temp);
-            gl.uniform1f(gl.getUniformLocation(program, 'uHighlights'), p.highlights);
-            gl.uniform1f(gl.getUniformLocation(program, 'uShadows'), p.shadows);
-            gl.uniform1f(gl.getUniformLocation(program, 'uContrast'), p.contrast);
-            gl.uniform1f(gl.getUniformLocation(program, 'uBrightness'), p.brightness);
-            gl.uniform1f(gl.getUniformLocation(program, 'uSaturation'), p.saturation);
-            gl.uniform1f(gl.getUniformLocation(program, 'uBrilliance'), p.brilliance);
+            for (let key in p) {
+                gl.uniform1f(gl.getUniformLocation(program, `u${key.charAt(0).toUpperCase() + key.slice(1)}`), p[key]);
+            }
 
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-            if (shouldCapture) {
-                captureFrame();
-                shouldCapture = false;
-            }
+            if (shouldCapture) { captureFrame(); shouldCapture = false; }
         }
         requestAnimationFrame(render);
     }
 
-    function requestCapture() {
+    function handleShutter() {
         if (burstPhotos.length >= 10) return;
         flash.style.opacity = '1';
         setTimeout(() => flash.style.opacity = '0', 60);
@@ -324,7 +368,6 @@
     }
 
     function captureFrame() {
-        // 以原圖解析度導出高品質影像
         canvas.toBlob(blob => {
             burstPhotos.push(blob);
             updateBurstUI();
@@ -332,19 +375,25 @@
     }
 
     function updateBurstUI() {
-        burstCountLabel.textContent = `${burstPhotos.length}/10`;
-        galleryTrigger.style.display = burstPhotos.length > 0 ? 'block' : 'none';
+        const count = burstPhotos.length;
+        burstCountLabel.textContent = count;
+        if (count > 0) {
+            galleryTrigger.style.visibility = 'visible';
+            galleryTrigger.style.backgroundImage = `url(${URL.createObjectURL(burstPhotos[count-1])})`;
+        } else {
+            galleryTrigger.style.visibility = 'hidden';
+        }
     }
 
-    function renderFilterButtons() {
-        const nav = document.getElementById('filter-nav');
+    function renderPresets() {
+        const nav = document.getElementById('vibe-nav');
         presets.forEach(item => {
-            const btn = document.createElement('button');
-            btn.className = 'filter-btn' + (item.id === activePreset.id ? ' active' : '');
+            const btn = document.createElement('div');
+            btn.className = 'vibe-btn' + (item.name === activePreset.name ? ' active' : '');
             btn.textContent = item.name;
             btn.onclick = () => {
                 activePreset = item;
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.vibe-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             };
             nav.appendChild(btn);
@@ -364,7 +413,7 @@
 
     async function saveSelected() {
         for (let blob of burstPhotos) {
-            const file = new File([blob], `Tactical_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const file = new File([blob], `Shot_${Date.now()}.jpg`, { type: 'image/jpeg' });
             if (navigator.share) await navigator.share({ files: [file] });
         }
         clearBurst(); closeGallery();
@@ -374,11 +423,15 @@
     function closeGallery() { galleryOverlay.style.display = 'none'; }
     function toggleCamera() { currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment'; initCamera(); }
 
+    // 雙擊畫面翻轉鏡頭
+    document.addEventListener('touchstart', (e) => {
+        const now = Date.now();
+        if (now - lastClickTime < 300) toggleCamera();
+        lastClickTime = now;
+    });
+
     window.addEventListener('resize', resize);
-    renderFilterButtons();
-    initWebGL();
-    initCamera();
-    requestAnimationFrame(render);
+    renderPresets(); initWebGL(); initCamera(); requestAnimationFrame(render);
 </script>
 </body>
 </html>
